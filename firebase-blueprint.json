@@ -1,0 +1,258 @@
+{
+  "entities": {
+    "Country": {
+      "title": "Country",
+      "description": "Supported marketplace country configuration.",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string", "minLength": 2, "maxLength": 4, "pattern": "^[A-Z]{2,4}$" },
+        "name": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "currency": { "type": "string", "minLength": 3, "maxLength": 3, "pattern": "^[A-Z]{3}$" },
+        "isActive": { "type": "boolean" }
+      },
+      "required": ["code", "name", "currency", "isActive"]
+    },
+    "Province": {
+      "title": "Province",
+      "description": "Sri Lankan province reference document.",
+      "type": "object",
+      "properties": {
+        "countryCode": { "type": "string", "minLength": 2, "maxLength": 4 },
+        "name": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "slug": { "type": "string", "minLength": 2, "maxLength": 80, "pattern": "^[a-z0-9-]+$" },
+        "order": { "type": "number" }
+      },
+      "required": ["countryCode", "name", "slug", "order"]
+    },
+    "District": {
+      "title": "District",
+      "description": "Sri Lankan district linked to a province.",
+      "type": "object",
+      "properties": {
+        "countryCode": { "type": "string", "minLength": 2, "maxLength": 4 },
+        "provinceId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "name": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "slug": { "type": "string", "minLength": 2, "maxLength": 80, "pattern": "^[a-z0-9-]+$" }
+      },
+      "required": ["countryCode", "provinceId", "name", "slug"]
+    },
+    "City": {
+      "title": "City",
+      "description": "City or town within a district.",
+      "type": "object",
+      "properties": {
+        "countryCode": { "type": "string", "minLength": 2, "maxLength": 4 },
+        "provinceId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "districtId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "name": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "isActive": { "type": "boolean" }
+      },
+      "required": ["countryCode", "provinceId", "districtId", "name", "isActive"]
+    },
+    "Category": {
+      "title": "Category",
+      "description": "Marketplace service category.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "slug": { "type": "string", "minLength": 2, "maxLength": 80, "pattern": "^[a-z0-9-]+$" },
+        "description": { "type": "string", "minLength": 5, "maxLength": 300 },
+        "iconName": { "type": "string", "minLength": 1, "maxLength": 50 },
+        "order": { "type": "number" },
+        "isActive": { "type": "boolean" }
+      },
+      "required": ["name", "slug", "description", "iconName", "order", "isActive"]
+    },
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Minimal non-PII user identity and account status.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "role": { "type": "string", "enum": ["customer", "worker", "support", "admin", "super_admin"] },
+        "displayName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "photoUrl": { "type": "string", "maxLength": 500 },
+        "status": { "type": "string", "enum": ["active", "suspended"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "role", "displayName", "status", "createdAt", "updatedAt"]
+    },
+    "UserPrivateInfo": {
+      "title": "UserPrivateInfo",
+      "description": "Isolated PII document for an authenticated user.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "email": { "type": "string", "format": "email", "maxLength": 254 },
+        "phone": { "type": "string", "maxLength": 30 },
+        "address": { "type": "string", "maxLength": 300 },
+        "savedWorkerIds": { "type": "array" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "updatedAt"]
+    },
+    "StaffRole": {
+      "title": "StaffRole",
+      "description": "Trusted server/super-admin assigned role record for Support, Admin, or Super Admin.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "role": { "type": "string", "enum": ["support", "admin", "super_admin"] },
+        "modules": { "type": "array" },
+        "assignedBy": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "role", "modules", "assignedBy", "updatedAt"]
+    },
+    "WorkerProfile": {
+      "title": "WorkerProfile",
+      "description": "Public service provider profile and admin approval status.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "businessName": { "type": "string", "minLength": 2, "maxLength": 120 },
+        "bio": { "type": "string", "minLength": 10, "maxLength": 1000 },
+        "photoUrl": { "type": "string", "maxLength": 500 },
+        "approvalStatus": { "type": "string", "enum": ["pending", "approved", "rejected", "suspended"] },
+        "serviceCategoryIds": { "type": "array" },
+        "provinceIds": { "type": "array" },
+        "districtIds": { "type": "array" },
+        "cityIds": { "type": "array" },
+        "workingHoursSummary": { "type": "string", "maxLength": 200 },
+        "ratingAvg": { "type": "number" },
+        "reviewCount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "uid",
+        "businessName",
+        "bio",
+        "approvalStatus",
+        "serviceCategoryIds",
+        "provinceIds",
+        "districtIds",
+        "ratingAvg",
+        "reviewCount",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Service": {
+      "title": "Service",
+      "description": "Individual service listing offered by an approved worker.",
+      "type": "object",
+      "properties": {
+        "workerId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "workerBusinessName": { "type": "string", "minLength": 2, "maxLength": 120 },
+        "categoryId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "title": { "type": "string", "minLength": 3, "maxLength": 120 },
+        "description": { "type": "string", "minLength": 10, "maxLength": 1500 },
+        "priceLkr": { "type": "number" },
+        "durationMinutes": { "type": "number" },
+        "imageUrl": { "type": "string", "maxLength": 500 },
+        "provinceIds": { "type": "array" },
+        "districtIds": { "type": "array" },
+        "cityIds": { "type": "array" },
+        "isActive": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "workerId",
+        "workerBusinessName",
+        "categoryId",
+        "title",
+        "description",
+        "priceLkr",
+        "durationMinutes",
+        "provinceIds",
+        "districtIds",
+        "isActive",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "SupportTicket": {
+      "title": "SupportTicket",
+      "description": "Contact Us inquiry or support request.",
+      "type": "object",
+      "properties": {
+        "senderName": { "type": "string", "minLength": 2, "maxLength": 100 },
+        "senderEmail": { "type": "string", "format": "email", "maxLength": 254 },
+        "userUid": { "type": "string", "maxLength": 128 },
+        "subject": { "type": "string", "minLength": 3, "maxLength": 150 },
+        "message": { "type": "string", "minLength": 10, "maxLength": 2000 },
+        "status": { "type": "string", "enum": ["open", "in_progress", "resolved"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["senderName", "senderEmail", "subject", "message", "status", "createdAt"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Immutable administrative and security audit trail entry.",
+      "type": "object",
+      "properties": {
+        "actorUid": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "actorRole": { "type": "string", "enum": ["support", "admin", "super_admin"] },
+        "action": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "targetType": { "type": "string", "minLength": 2, "maxLength": 60 },
+        "targetId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "summary": { "type": "string", "minLength": 2, "maxLength": 300 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["actorUid", "actorRole", "action", "targetType", "targetId", "summary", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/countries/{countryId}": {
+      "schema": { "$ref": "#/entities/Country" },
+      "description": "Supported country metadata."
+    },
+    "/locations_provinces/{provinceId}": {
+      "schema": { "$ref": "#/entities/Province" },
+      "description": "Sri Lanka 9 provinces."
+    },
+    "/locations_districts/{districtId}": {
+      "schema": { "$ref": "#/entities/District" },
+      "description": "Sri Lanka 25 districts."
+    },
+    "/locations_cities/{cityId}": {
+      "schema": { "$ref": "#/entities/City" },
+      "description": "Sri Lanka cities and towns."
+    },
+    "/categories/{categoryId}": {
+      "schema": { "$ref": "#/entities/Category" },
+      "description": "Marketplace service categories."
+    },
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Non-PII user identity and role summary."
+    },
+    "/users/{userId}/private/{docId}": {
+      "schema": { "$ref": "#/entities/UserPrivateInfo" },
+      "description": "Isolated user PII (email, phone, address, saved workers)."
+    },
+    "/staff_roles/{userId}": {
+      "schema": { "$ref": "#/entities/StaffRole" },
+      "description": "Authoritative Support/Admin/Super Admin role assignments."
+    },
+    "/workers/{workerId}": {
+      "schema": { "$ref": "#/entities/WorkerProfile" },
+      "description": "Worker business profiles and approval states."
+    },
+    "/services/{serviceId}": {
+      "schema": { "$ref": "#/entities/Service" },
+      "description": "Service offerings listed by approved workers."
+    },
+    "/support_tickets/{ticketId}": {
+      "schema": { "$ref": "#/entities/SupportTicket" },
+      "description": "Customer and visitor support inquiries."
+    },
+    "/audit_logs/{logId}": {
+      "schema": { "$ref": "#/entities/AuditLog" },
+      "description": "Immutable administrative audit logs."
+    }
+  }
+}

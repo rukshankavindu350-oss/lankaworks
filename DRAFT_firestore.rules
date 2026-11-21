@@ -1,0 +1,321 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helper Primitives ---
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isBootstrappedSuperAdmin() {
+      return isEmailVerified() && request.auth.token.email == 'rukshankavindu350@gmail.com';
+    }
+
+    function hasStaffRole(roles) {
+      return isEmailVerified() &&
+        exists(/databases/$(database)/documents/staff_roles/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/staff_roles/$(request.auth.uid)).data.role in roles;
+    }
+
+    function isSuperAdmin() {
+      return isBootstrappedSuperAdmin() || hasStaffRole(['super_admin']);
+    }
+
+    function isAdmin() {
+      return isSuperAdmin() || hasStaffRole(['admin']);
+    }
+
+    // --- Validation Blueprints ---
+    function isValidCountry(data) {
+      return data.keys().hasAll(['code', 'name', 'currency', 'isActive']) &&
+        data.keys().hasOnly(['code', 'name', 'currency', 'isActive']) &&
+        data.code is string && data.code.size() >= 2 && data.code.size() <= 4 &&
+        data.name is string && data.name.size() >= 2 && data.name.size() <= 80 &&
+        data.currency is string && data.currency.size() == 3 &&
+        data.isActive is bool;
+    }
+
+    function isValidProvince(data) {
+      return data.keys().hasAll(['countryCode', 'name', 'slug', 'order']) &&
+        data.keys().hasOnly(['countryCode', 'name', 'slug', 'order']) &&
+        data.countryCode is string && data.countryCode.size() >= 2 && data.countryCode.size() <= 4 &&
+        data.name is string && data.name.size() >= 2 && data.name.size() <= 80 &&
+        data.slug is string && data.slug.size() >= 2 && data.slug.size() <= 80 &&
+        data.order is number && data.order >= 1 && data.order <= 100;
+    }
+
+    function isValidDistrict(data) {
+      return data.keys().hasAll(['countryCode', 'provinceId', 'name', 'slug']) &&
+        data.keys().hasOnly(['countryCode', 'provinceId', 'name', 'slug']) &&
+        data.countryCode is string && data.countryCode.size() >= 2 && data.countryCode.size() <= 4 &&
+        isValidId(data.provinceId) &&
+        data.name is string && data.name.size() >= 2 && data.name.size() <= 80 &&
+        data.slug is string && data.slug.size() >= 2 && data.slug.size() <= 80;
+    }
+
+    function isValidCity(data) {
+      return data.keys().hasAll(['countryCode', 'provinceId', 'districtId', 'name', 'isActive']) &&
+        data.keys().hasOnly(['countryCode', 'provinceId', 'districtId', 'name', 'isActive']) &&
+        data.countryCode is string && data.countryCode.size() >= 2 && data.countryCode.size() <= 4 &&
+        isValidId(data.provinceId) &&
+        isValidId(data.districtId) &&
+        data.name is string && data.name.size() >= 2 && data.name.size() <= 80 &&
+        data.isActive is bool;
+    }
+
+    function isValidCategory(data) {
+      return data.keys().hasAll(['name', 'slug', 'description', 'iconName', 'order', 'isActive']) &&
+        data.keys().hasOnly(['name', 'slug', 'description', 'iconName', 'order', 'isActive']) &&
+        data.name is string && data.name.size() >= 2 && data.name.size() <= 80 &&
+        data.slug is string && data.slug.size() >= 2 && data.slug.size() <= 80 &&
+        data.description is string && data.description.size() >= 5 && data.description.size() <= 300 &&
+        data.iconName is string && data.iconName.size() >= 1 && data.iconName.size() <= 50 &&
+        data.order is number && data.order >= 1 && data.order <= 500 &&
+        data.isActive is bool;
+    }
+
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['uid', 'role', 'displayName', 'status', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['uid', 'role', 'displayName', 'photoUrl', 'status', 'createdAt', 'updatedAt']) &&
+        isValidId(data.uid) &&
+        data.role in ['customer', 'worker', 'support', 'admin', 'super_admin'] &&
+        data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 100 &&
+        (!('photoUrl' in data) || (data.photoUrl is string && data.photoUrl.size() <= 500)) &&
+        data.status in ['active', 'suspended'] &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidUserPrivateInfo(data) {
+      return data.keys().hasAll(['uid', 'email', 'updatedAt']) &&
+        data.keys().hasOnly(['uid', 'email', 'phone', 'address', 'savedWorkerIds', 'updatedAt']) &&
+        isValidId(data.uid) &&
+        data.email is string && data.email.size() >= 3 && data.email.size() <= 254 &&
+        (!('phone' in data) || (data.phone is string && data.phone.size() <= 30)) &&
+        (!('address' in data) || (data.address is string && data.address.size() <= 300)) &&
+        (!('savedWorkerIds' in data) || (
+          data.savedWorkerIds is list &&
+          data.savedWorkerIds.size() <= 50 &&
+          (data.savedWorkerIds.size() == 0 || data.savedWorkerIds[0] is string)
+        )) &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidStaffRole(data) {
+      return data.keys().hasAll(['uid', 'role', 'modules', 'assignedBy', 'updatedAt']) &&
+        data.keys().hasOnly(['uid', 'role', 'modules', 'assignedBy', 'updatedAt']) &&
+        isValidId(data.uid) &&
+        data.role in ['support', 'admin', 'super_admin'] &&
+        data.modules is list && data.modules.size() <= 30 &&
+        (data.modules.size() == 0 || data.modules[0] is string) &&
+        isValidId(data.assignedBy) &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidWorkerProfile(data) {
+      return data.keys().hasAll([
+          'uid', 'businessName', 'bio', 'approvalStatus',
+          'serviceCategoryIds', 'provinceIds', 'districtIds',
+          'ratingAvg', 'reviewCount', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'uid', 'businessName', 'bio', 'photoUrl', 'approvalStatus',
+          'serviceCategoryIds', 'provinceIds', 'districtIds', 'cityIds',
+          'workingHoursSummary', 'ratingAvg', 'reviewCount', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidId(data.uid) &&
+        data.businessName is string && data.businessName.size() >= 2 && data.businessName.size() <= 120 &&
+        data.bio is string && data.bio.size() >= 10 && data.bio.size() <= 1000 &&
+        (!('photoUrl' in data) || (data.photoUrl is string && data.photoUrl.size() <= 500)) &&
+        data.approvalStatus in ['pending', 'approved', 'rejected', 'suspended'] &&
+        data.serviceCategoryIds is list && data.serviceCategoryIds.size() >= 1 && data.serviceCategoryIds.size() <= 10 && data.serviceCategoryIds[0] is string &&
+        data.provinceIds is list && data.provinceIds.size() >= 1 && data.provinceIds.size() <= 9 && data.provinceIds[0] is string &&
+        data.districtIds is list && data.districtIds.size() >= 1 && data.districtIds.size() <= 25 && data.districtIds[0] is string &&
+        (!('cityIds' in data) || (data.cityIds is list && data.cityIds.size() <= 50 && (data.cityIds.size() == 0 || data.cityIds[0] is string))) &&
+        (!('workingHoursSummary' in data) || (data.workingHoursSummary is string && data.workingHoursSummary.size() <= 200)) &&
+        data.ratingAvg is number && data.ratingAvg >= 0 && data.ratingAvg <= 5 &&
+        data.reviewCount is number && data.reviewCount >= 0 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidAuditLog(data) {
+      return data.keys().hasAll(['actorUid', 'actorRole', 'action', 'targetType', 'targetId', 'summary', 'createdAt']) &&
+        data.keys().hasOnly(['actorUid', 'actorRole', 'action', 'targetType', 'targetId', 'summary', 'createdAt']) &&
+        isValidId(data.actorUid) &&
+        data.actorRole in ['support', 'admin', 'super_admin'] &&
+        data.action is string && data.action.size() >= 2 && data.action.size() <= 80 &&
+        data.targetType is string && data.targetType.size() >= 2 && data.targetType.size() <= 60 &&
+        isValidId(data.targetId) &&
+        data.summary is string && data.summary.size() >= 2 && data.summary.size() <= 300 &&
+        data.createdAt is timestamp;
+    }
+
+    // --- Collection Rules ---
+    match /test/connection {
+      allow get: if true;
+      allow list, write: if false;
+    }
+
+    match /countries/{countryId} {
+      allow get: if isValidId(countryId);
+      allow list: if true;
+      allow create, update: if isAdmin() && isValidId(countryId) && isValidCountry(incoming());
+      allow delete: if isSuperAdmin() && isValidId(countryId);
+    }
+
+    match /locations_provinces/{provinceId} {
+      allow get: if isValidId(provinceId);
+      allow list: if true;
+      allow create, update: if isAdmin() && isValidId(provinceId) && isValidProvince(incoming());
+      allow delete: if isSuperAdmin() && isValidId(provinceId);
+    }
+
+    match /locations_districts/{districtId} {
+      allow get: if isValidId(districtId);
+      allow list: if true;
+      allow create, update: if isAdmin() && isValidId(districtId) && isValidDistrict(incoming());
+      allow delete: if isSuperAdmin() && isValidId(districtId);
+    }
+
+    match /locations_cities/{cityId} {
+      allow get: if isValidId(cityId);
+      allow list: if true;
+      allow create, update: if isAdmin() && isValidId(cityId) && isValidCity(incoming());
+      allow delete: if isSuperAdmin() && isValidId(cityId);
+    }
+
+    match /categories/{categoryId} {
+      allow get: if isValidId(categoryId);
+      allow list: if true;
+      allow create, update: if isAdmin() && isValidId(categoryId) && isValidCategory(incoming());
+      allow delete: if isSuperAdmin() && isValidId(categoryId);
+    }
+
+    match /users/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && (request.auth.uid == userId || isAdmin());
+      allow list: if isBootstrappedSuperAdmin();
+      allow create: if isSignedIn() && isValidId(userId) &&
+        request.auth.uid == userId &&
+        isValidUserProfile(incoming()) &&
+        incoming().uid == request.auth.uid &&
+        incoming().role in ['customer', 'worker'] &&
+        incoming().status == 'active' &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isSignedIn() && isValidId(userId) &&
+        isValidUserProfile(incoming()) && (
+          // Action: User updates own display profile (role and status immutable)
+          (request.auth.uid == userId &&
+            incoming().uid == existing().uid &&
+            incoming().role == existing().role &&
+            incoming().status == existing().status &&
+            incoming().createdAt == existing().createdAt &&
+            incoming().updatedAt == request.time &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoUrl', 'updatedAt'])) ||
+          // Action: Admin suspends/reactivates account (cannot change to admin/super_admin unless Super Admin)
+          (isAdmin() &&
+            incoming().uid == existing().uid &&
+            incoming().createdAt == existing().createdAt &&
+            incoming().updatedAt == request.time &&
+            (isSuperAdmin() || (incoming().role == existing().role && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']))))
+        );
+      allow delete: if false;
+
+      match /private/{docId} {
+        allow get: if isSignedIn() && isValidId(userId) && isValidId(docId) && (request.auth.uid == userId || isAdmin());
+        allow list: if false;
+        allow create, update: if isSignedIn() && isValidId(userId) && isValidId(docId) &&
+          request.auth.uid == userId &&
+          isValidUserPrivateInfo(incoming()) &&
+          incoming().uid == request.auth.uid &&
+          incoming().updatedAt == request.time;
+        allow delete: if false;
+      }
+    }
+
+    match /staff_roles/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && (request.auth.uid == userId || isSuperAdmin());
+      allow list: if isBootstrappedSuperAdmin();
+      allow create, update: if isSuperAdmin() && isValidId(userId) &&
+        isValidStaffRole(incoming()) &&
+        incoming().uid == userId &&
+        incoming().assignedBy == request.auth.uid &&
+        incoming().updatedAt == request.time;
+      allow delete: if isSuperAdmin() && isValidId(userId);
+    }
+
+    match /workers/{workerId} {
+      allow get: if isValidId(workerId) && (
+        existing().approvalStatus == 'approved' ||
+        (isSignedIn() && existing().uid == request.auth.uid) ||
+        isAdmin()
+      );
+      allow list: if resource.data.approvalStatus == 'approved' ||
+        (isSignedIn() && resource.data.uid == request.auth.uid) ||
+        isBootstrappedSuperAdmin();
+      allow create: if isEmailVerified() && isValidId(workerId) &&
+        workerId == request.auth.uid &&
+        isValidWorkerProfile(incoming()) &&
+        incoming().uid == request.auth.uid &&
+        incoming().approvalStatus == 'pending' &&
+        incoming().ratingAvg == 0 &&
+        incoming().reviewCount == 0 &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isEmailVerified() && isValidId(workerId) &&
+        isValidWorkerProfile(incoming()) && (
+          // Action: Worker edits business details (approvalStatus and rating stats locked)
+          (existing().uid == request.auth.uid &&
+            incoming().uid == existing().uid &&
+            incoming().approvalStatus == existing().approvalStatus &&
+            incoming().ratingAvg == existing().ratingAvg &&
+            incoming().reviewCount == existing().reviewCount &&
+            incoming().createdAt == existing().createdAt &&
+            incoming().updatedAt == request.time &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'businessName', 'bio', 'photoUrl', 'serviceCategoryIds',
+              'provinceIds', 'districtIds', 'cityIds', 'workingHoursSummary', 'updatedAt'
+            ])) ||
+          // Action: Admin updates worker approval status
+          (isAdmin() &&
+            incoming().uid == existing().uid &&
+            incoming().createdAt == existing().createdAt &&
+            incoming().updatedAt == request.time &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['approvalStatus', 'updatedAt']))
+        );
+      allow delete: if false;
+    }
+
+    match /audit_logs/{logId} {
+      allow get: if isAdmin() && isValidId(logId);
+      allow list: if isBootstrappedSuperAdmin();
+      allow create: if isAdmin() && isValidId(logId) &&
+        isValidAuditLog(incoming()) &&
+        incoming().actorUid == request.auth.uid &&
+        incoming().createdAt == request.time;
+      allow update, delete: if false;
+    }
+  }
+}

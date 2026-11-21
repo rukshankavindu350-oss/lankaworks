@@ -1,0 +1,6 @@
+{
+  "name": "LankaWorks",
+  "description": "Sri Lanka Local Services Marketplace connecting customers with verified local service providers across all 9 provinces and 25 districts.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
